@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fingerprint Blood Group Prediction</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .result-card {
+            transition: all 0.3s ease-in-out;
+        }
+        .uploading {
+            opacity: 0.7;
+        }
+        .confidence-bar {
+            height: 10px;
+            border-radius: 5px;
+            transition: width 0.5s ease-in-out;
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+        .blood-group {
+            font-size: 3rem;
+            font-weight: bold;
+        }
+        .fingerprint-container {
+            width: 120px;
+            height: 120px;
+            position: relative;
+            margin: 0 auto;
+        }
+        .fingerprint-scan {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: #1e293b;
+            position: relative;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
+            overflow: hidden;
+        }
+        .fingerprint-lines path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: dash 2s linear forwards;
+        }
+        .scan-line {
+            position: absolute;
+            height: 2px;
+            width: 100%;
+            background: rgba(59, 130, 246, 0.8);
+            top: 0;
+            box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.8);
+            animation: scan 2.5s linear infinite;
+        }
+        .grid-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 10%, transparent 70%);
+            animation: rotateGrid 4s linear infinite;
+        }
+        @keyframes dash {
+            from {
+                stroke-dashoffset: 1000;
+            }
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+        @keyframes scan {
+            0% {
+                top: 0;
+            }
+            100% {
+                top: 100%;
+            }
+        }
+        @keyframes rotateGrid {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl font-bold text-gray-800">Fingerprint Blood Group Prediction</h1>
+            <p class="text-gray-600 mt-2">Upload a fingerprint image to predict blood group</p>
+        </header>
+
+        <div class="max-w-xl mx-auto bg-white rounded-lg shadow-md p-6">
+            <div class="mb-6">
+                <div class="flex items-center justify-center w-full">
+                    <label class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6" id="upload-prompt">
+                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                            <p class="text-xs text-gray-500">PNG, JPG, JPEG or BMP (MAX. 16MB)</p>
+                        </div>
+                        <div class="hidden flex-col items-center justify-center pt-5 pb-6" id="preview-container">
+                            <img id="image-preview" class="max-h-56 rounded-lg" src="#" alt="Preview">
+                            <p class="mt-2 text-sm text-gray-500">Click or drag another image to change</p>
+                        </div>
+                        <input id="file-upload" type="file" class="hidden" accept=".png,.jpg,.jpeg,.bmp,.BMP" />
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-center mt-4">
+                <button id="predict-btn" class="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Predict Blood Group
+                </button>
+            </div>
+
+            <div id="result-section" class="mt-8 hidden">
+                <div class="result-card border rounded-lg p-6 text-center">
+                    <h2 class="text-xl font-semibold mb-4">Prediction Result</h2>
+                    
+                    <div id="loading" class="py-8 hidden">
+                        <div class="fingerprint-container">
+                            <div class="fingerprint-scan">
+                                <svg class="fingerprint-lines" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M50,5 C30,5 15,20 15,40 C15,60 30,80 50,80 C70,80 85,60 85,40 C85,20 70,5 50,5" fill="none" stroke="#3b82f6" stroke-width="2"/>
+                                    <path d="M50,15 C35,15 25,25 25,40 C25,55 35,70 50,70 C65,70 75,55 75,40 C75,25 65,15 50,15" fill="none" stroke="#3b82f6" stroke-width="2"/>
+                                    <path d="M50,25 C40,25 35,35 35,50 C35,65 40,75 50,75 C60,75 65,65 65,50 C65,35 60,25 50,25" fill="none" stroke="#3b82f6" stroke-width="2"/>
+                                    <path d="M40,50 C40,60 45,65 50,65" fill="none" stroke="#3b82f6" stroke-width="2"/>
+                                    <path d="M60,50 C60,60 55,65 50,65" fill="none" stroke="#3b82f6" stroke-width="2"/>
+                                    <path d="M40,50 C40,40 45,35 50,35" fill="none" stroke="#3b82f6" stroke-width="2"/>
+                                    <path d="M60,50 C60,40 55,35 50,35" fill="none" stroke="#3b82f6" stroke-width="2"/>
+                                </svg>
+                                <div class="scan-line"></div>
+                                <div class="grid-overlay"></div>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-gray-600 text-center">Analyzing fingerprint patterns...</p>
+                    </div>
+                    
+                    <div id="result-content">
+                        <div class="blood-group text-4xl font-bold mb-4" id="blood-group">A+</div>
+                        <div class="mb-4">
+                            <p class="text-gray-700">Confidence: <span id="confidence-value">95.5</span>%</p>
+                            <div class="w-full bg-gray-200 rounded-full mt-2">
+                                <div id="confidence-bar" class="confidence-bar bg-green-600" style="width: 95%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="error-message" class="text-red-500 mt-4 hidden"></div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="mt-12 text-center text-gray-500 text-sm">
+            <p>© 2025 Fingerprint Blood Group Prediction</p>
+            <p class="mt-1">For research purposes only. Not for clinical use.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileUpload = document.getElementById('file-upload');
+            const predictBtn = document.getElementById('predict-btn');
+            const uploadPrompt = document.getElementById('upload-prompt');
+            const previewContainer = document.getElementById('preview-container');
+            const imagePreview = document.getElementById('image-preview');
+            const resultSection = document.getElementById('result-section');
+            const loading = document.getElementById('loading');
+            const resultContent = document.getElementById('result-content');
+            const bloodGroup = document.getElementById('blood-group');
+            const confidenceValue = document.getElementById('confidence-value');
+            const confidenceBar = document.getElementById('confidence-bar');
+            const errorMessage = document.getElementById('error-message');
+            
+            // API endpoint
+            const API_URL = '/api/predict';
+            
+            // Simulated loading time in milliseconds (3 seconds)
+            const LOADING_TIME = 3000;
+            
+            // Handle file selection
+            fileUpload.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                
+                if (file) {
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        imagePreview.src = e.target.result;
+                        uploadPrompt.classList.add('hidden');
+                        previewContainer.classList.remove('hidden');
+                        predictBtn.disabled = false;
+                        
+                        // Hide previous results if any
+                        resultSection.classList.add('hidden');
+                    };
+                    
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            // Handle drag and drop functionality
+            const uploadArea = document.querySelector('label');
+            
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('bg-gray-200');
+                this.classList.remove('bg-gray-50');
+            });
+            
+            uploadArea.addEventListener('dragleave', function() {
+                this.classList.remove('bg-gray-200');
+                this.classList.add('bg-gray-50');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('bg-gray-200');
+                this.classList.add('bg-gray-50');
+                
+                if (e.dataTransfer.files.length) {
+                    fileUpload.files = e.dataTransfer.files;
+                    const file = e.dataTransfer.files[0];
+                    
+                    if (file) {
+                        const reader = new FileReader();
+                        
+                        reader.onload = function(e) {
+                            imagePreview.src = e.target.result;
+                            uploadPrompt.classList.add('hidden');
+                            previewContainer.classList.remove('hidden');
+                            predictBtn.disabled = false;
+                            
+                            // Hide previous results if any
+                            resultSection.classList.add('hidden');
+                        };
+                        
+                        reader.readAsDataURL(file);
+                    }
+                }
+            });
+            
+            // Handle prediction
+            predictBtn.addEventListener('click', function() {
+                if (!fileUpload.files[0]) {
+                    return;
+                }
+                
+                // Show loading state
+                resultSection.classList.remove('hidden');
+                loading.classList.remove('hidden');
+                resultContent.classList.add('hidden');
+                errorMessage.classList.add('hidden');
+                
+                const formData = new FormData();
+                formData.append('file', fileUpload.files[0]);
+                
+                // Simulate a delay for the loading animation to be visible
+                setTimeout(() => {
+                    fetch(API_URL, {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        loading.classList.add('hidden');
+                        resultContent.classList.remove('hidden');
+                        
+                        if (data.error) {
+                            showError(data.error);
+                            return;
+                        }
+                        
+                        // Update results
+                        bloodGroup.textContent = data.blood_group;
+                        confidenceValue.textContent = data.confidence.toFixed(1);
+                        
+                        // Update confidence bar
+                        const confidencePercent = data.confidence;
+                        confidenceBar.style.width = `${confidencePercent}%`;
+                        
+                        // Change color based on confidence level
+                        if (confidencePercent >= 80) {
+                            confidenceBar.className = 'confidence-bar bg-green-600';
+                        } else if (confidencePercent >= 60) {
+                            confidenceBar.className = 'confidence-bar bg-yellow-500';
+                        } else {
+                            confidenceBar.className = 'confidence-bar bg-red-500';
+                        }
+                        
+                        // Add a CSS class based on blood type for visual styling
+                        bloodGroup.className = 'blood-group text-4xl font-bold mb-4';
+                        
+                        // Add blood group specific styling
+                        const bloodGroupStyle = getBloodGroupStyle(data.blood_group);
+                        bloodGroup.classList.add(bloodGroupStyle.color);
+                    })
+                    .catch(error => {
+                        showError('Error communicating with the server. Please try again.');
+                        console.error('Error:', error);
+                    });
+                }, LOADING_TIME); // Delay for the loading animation
+            });
+            
+            function showError(message) {
+                loading.classList.add('hidden');
+                resultContent.classList.add('hidden');
+                errorMessage.classList.remove('hidden');
+                errorMessage.textContent = message;
+            }
+            
+            function getBloodGroupStyle(bloodGroup) {
+                const styles = {
+                    'A+': { color: 'text-red-600' },
+                    'A-': { color: 'text-red-700' },
+                    'B+': { color: 'text-blue-600' },
+                    'B-': { color: 'text-blue-700' },
+                    'AB+': { color: 'text-purple-600' },
+                    'AB-': { color: 'text-purple-700' },
+                    'O+': { color: 'text-green-600' },
+                    'O-': { color: 'text-green-700' },
+                    'Unknown': { color: 'text-gray-600' }
+                };
+                
+                return styles[bloodGroup] || styles['Unknown'];
+            }
+        });
+    </script>
+</body>
+</html>

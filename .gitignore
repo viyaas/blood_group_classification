@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+env/
+.env
+
+# Local fingerprint images (biometric data) and scratch uploads
+uploads/
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
