@@ -16,7 +16,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp'}
 IMAGE_SIZE = (128, 128)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
-# MODEL_VARIANT selects which trained model to serve: "all" (8 classes) or "positive" (4 classes).
+# MODEL_VARIANT selects which trained model to serve: "positive" (4 classes) or "all" (8 classes, less accurate).
 MODELS = {
     'all': {
         'path': os.path.join(BASE_DIR, 'models', 'fingerprint_bloodgroup.h5'),
@@ -28,7 +28,7 @@ MODELS = {
     },
 }
 
-MODEL_VARIANT = os.environ.get('MODEL_VARIANT', 'all')
+MODEL_VARIANT = os.environ.get('MODEL_VARIANT', 'positive')
 if MODEL_VARIANT not in MODELS:
     raise SystemExit(f"MODEL_VARIANT must be one of {sorted(MODELS)}, got '{MODEL_VARIANT}'")
 
